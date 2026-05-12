@@ -1,0 +1,49 @@
+# =============================================
+# VIDIX - .gitignore
+# =============================================
+
+# --- Thông tin nhạy cảm ---
+# (sẽ chuyển sang .env sau)
+# functions/conn-login-logout.php  ← tạm thời vẫn track nhưng cần xử lý sau
+
+# --- Thư mục upload / output (dữ liệu thực, không đưa lên git) ---
+Upload/
+outputs/
+
+# --- Vendor / thư viện Composer ---
+classes/vendor/
+classes/PHPExcel/
+classes/WebClientPrint-PHP-main/
+classes/zprinter*/
+
+# --- File backup thủ công (tên có ngày tháng) ---
+[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*.php
+[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.php
+20[0-9][0-9]*.php
+20[0-9][0-9]*.js
+PHP/20[0-9][0-9]*.php
+js/Vidix/20[0-9][0-9]*.js
+VIDIX_function/20[0-9][0-9]*.php
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# --- Log files ---
+*.log
+error_log
+
+# --- Database dump (nếu có) ---
+*.sql
+*.sql.gz
+db.opt
+
+# --- Temp ---
+*.tmp
+*.bak
+*.orig

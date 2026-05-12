@@ -1,0 +1,153 @@
+ /* ===== CÂY ĐA CẤP ===== */
+        .tree-node {
+            display: flex;
+            align-items: flex-start;
+            padding: 7px 10px;
+            border-radius: 5px;
+            margin-bottom: 4px;
+            border-left: 3px solid transparent;
+            transition: background 0.15s;
+        }
+        .tree-node:hover { background: #f5f8fb; }
+
+        /* Màu theo depth */
+        .depth-1 { border-left-color: #2a5f96; background: #f0f6ff; }
+        .depth-2 { border-left-color: #27ae60; background: #f0fff5; }
+        .depth-3 { border-left-color: #e67e22; background: #fff8f0; }
+        .depth-4 { border-left-color: #8e44ad; background: #fdf0ff; }
+        .depth-5 { border-left-color: #c0392b; background: #fff0f0; }
+
+        .tree-indent { flex-shrink: 0; color: #ccc; font-size: 13px; }
+        .tree-icon   { flex-shrink: 0; margin-right: 8px; font-size: 16px; }
+
+        .tree-body  { flex: 1; min-width: 0; }
+        .tree-name  { font-weight: 700; font-size: 13px; color: #1a3c5e; }
+        .tree-meta  {
+            font-size: 11px; color: #7f8c9a;
+            display: flex; flex-wrap: wrap; gap: 8px;
+            margin-top: 2px;
+        }
+        .tree-meta span { white-space: nowrap; }
+
+        .tree-badges { flex-shrink: 0; text-align: right; padding-left: 8px; }
+
+        /* Badge trạng thái is_active */
+        .badge-active-hh {
+            display: inline-block; padding: 1px 7px; border-radius: 10px;
+            font-size: 10px; font-weight: 700;
+            background: #d4efdf; color: #1e8449;
+        }
+        .badge-inactive-hh {
+            display: inline-block; padding: 1px 7px; border-radius: 10px;
+            font-size: 10px; font-weight: 700;
+            background: #fdecea; color: #c0392b;
+        }
+
+        /* Ô thông tin bản thân (self) */
+        .self-card {
+            background: linear-gradient(135deg, #1a3c5e 0%, #2a5f96 100%);
+            color: #fff; border-radius: 8px; padding: 14px 18px;
+            margin-bottom: 14px; display: flex;
+            align-items: center; gap: 16px;
+        }
+        .self-card .self-avatar {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0;
+        }
+        .self-card .self-name  { font-size: 17px; font-weight: 700; }
+        .self-card .self-meta  { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+        .self-card .self-stats {
+            margin-left: auto; text-align: center;
+            display: flex; gap: 20px;
+        }
+        .self-card .self-stat-item { text-align: center; }
+        .self-card .self-stat-num  { font-size: 22px; font-weight: 700; display: block; }
+        .self-card .self-stat-lbl  { font-size: 10px; opacity: 0.75; }
+
+        /* Ô sponsor */
+        .sponsor-card {
+            background: #fff8e1; border: 1px solid #f5c060;
+            border-radius: 6px; padding: 10px 14px;
+            margin-bottom: 14px; font-size: 13px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .sponsor-card .sp-icon { font-size: 20px; }
+        .sponsor-card .sp-label { color: #7f8c9a; font-size: 11px; }
+        .sponsor-card .sp-name  { font-weight: 700; color: #1a3c5e; }
+
+        /* Thống kê mini */
+        .tree-stats {
+            display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+        }
+        .tree-stat-box {
+            flex: 1; min-width: 90px;
+            background: #f5f8fb; border-radius: 6px;
+            padding: 8px 12px; text-align: center;
+        }
+        .tree-stat-box .tsb-num  { font-size: 20px; font-weight: 700; color: #1a3c5e; }
+        .tree-stat-box .tsb-lbl  { font-size: 11px; color: #7f8c9a; }
+
+        /* Phân bổ cấp nhỏ */
+        .rank-dist { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .rank-chip {
+            padding: 2px 10px; border-radius: 12px;
+            background: #1a3c5e; color: #fff;
+            font-size: 11px; font-weight: 700;
+        }
+
+        /* Modal to hơn */
+        .modal-tree .modal-dialog { width: 720px; max-width: 95vw; }
+
+        .tree-section-title {
+            font-size: 12px; font-weight: 700; color: #7f8c9a;
+            text-transform: uppercase; letter-spacing: 0.7px;
+            margin: 10px 0 6px; padding-bottom: 4px;
+            border-bottom: 1px solid #e8eef4;
+        }
+
+        /* Scroll vùng cây */
+        .tree-scroll {
+            max-height: 420px; overflow-y: auto;
+            padding-right: 4px;
+        }
+        .tree-scroll::-webkit-scrollbar { width: 4px; }
+        .tree-scroll::-webkit-scrollbar-track { background: #f0f4f8; }
+        .tree-scroll::-webkit-scrollbar-thumb { background: #b0c4d8; border-radius: 4px; }
+
+        /* Loading */
+        .tree-loading {
+            text-align: center; padding: 40px;
+            color: #7f8c9a; font-size: 14px;
+        }
+        .tree-loading .spinner {
+            display: inline-block; width: 32px; height: 32px;
+            border: 3px solid #e8eef4;
+            border-top-color: #2a5f96;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Tên nhân viên có thể click */
+        .agent-name-link {
+            color: #1a3c5e; cursor: pointer;
+            border-bottom: 1px dashed #2a5f96;
+            text-decoration: none;
+        }
+        .agent-name-link:hover { color: #2a5f96; text-decoration: none; }
+		.action-btn {
+			width: 36px;              /* ✅ độ rộng cố định */
+			height: 30px;             /* ✅ chiều cao đẹp */
+			display: inline-flex;     /* ✅ flex để căn giữa */
+			align-items: center;      /* căn dọc */
+			justify-content: center;  /* căn ngang */
+			padding: 0;
+		}
+
+		.action-cell {
+			white-space: nowrap;      /* tránh xuống dòng */
+		}
+		

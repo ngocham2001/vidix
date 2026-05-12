@@ -3,7 +3,7 @@
 # =============================================
 
 # --- Thông tin nhạy cảm ---
-# (sẽ chuyển sang .env sau)
+.env
 # functions/conn-login-logout.php  ← tạm thời vẫn track nhưng cần xử lý sau
 
 # --- Thư mục upload / output (dữ liệu thực, không đưa lên git) ---

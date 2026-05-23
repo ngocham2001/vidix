@@ -47,6 +47,7 @@ include_once 'PHP/TT_Hopdong_ChuyenChinhThuc_PHP.php';
             </button>
         </span>
     </form>
+	
 </div>
 
 <!-- MESSAGE BOX -->
@@ -235,6 +236,55 @@ include_once 'PHP/TT_Hopdong_ChuyenChinhThuc_PHP.php';
         <input type="button" value="Hủy" id="cancel_edit" class="btn btn-default btn-sm"/>
     </form>
 </div>
+<!-- ============================================================
+     PHẦN 3: Modal xác nhận CHUYỂN CHÍNH THỨC (thêm vào trước </body>)
+     ============================================================ -->
+<div class="modal fade" id="modal-confirmCT" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+ 
+            <div class="modal-header" style="background:#27ae60;color:#fff;border-radius:5px 5px 0 0;">
+                <button type="button" class="close" data-dismiss="modal"
+                        style="color:#fff;opacity:0.8;">&times;</button>
+                <h4 class="modal-title">
+                    <span class="glyphicon glyphicon-share-alt"></span>
+                    &nbsp; Xác nhận chuyển chính thức
+                    (<span id="modal-ct-count">0</span> hợp đồng)
+                </h4>
+            </div>
+ 
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:10px;">
+                    <span class="glyphicon glyphicon-info-sign"></span>
+                    Hệ thống sẽ thực hiện toàn bộ các bước xử lý: cập nhật nộp tiền,
+                    tạo đợt AG/A, tính điểm, tính hoa hồng, kiểm tra thăng cấp.
+                    <strong>Thao tác không thể hoàn tác.</strong>
+                </p>
+ 
+                <!-- Danh sách HĐ được chọn -->
+                <div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:4px;
+                            padding:10px 14px;margin-bottom:12px;max-height:180px;overflow-y:auto;">
+                    <strong style="font-size:12px;color:#555;">Danh sách hợp đồng sẽ xử lý:</strong>
+                    <div id="modal-ct-list" style="margin-top:6px;font-size:13px;"></div>
+                </div>
+ 
+                <!-- Kết quả xử lý (hiện sau khi AJAX trả về) -->
+                <div id="modal-ct-result" style="display:none;max-height:300px;overflow-y:auto;"></div>
+            </div>
+ 
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">
+                    Đóng
+                </button>
+                <button type="button" class="btn btn-success btn-sm" id="btn-ct-xacnhan">
+                    <span class="glyphicon glyphicon-ok"></span> Xác nhận chuyển
+                </button>
+            </div>
+ 
+        </div>
+    </div>
+</div>
+
 
 <?php include_once 'html/emb_js.php'; ?>
 <script src="js/vidix/TT_Hopdong_ChuyenChinhThuc.js" type="text/javascript"></script>

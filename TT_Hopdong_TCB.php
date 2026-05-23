@@ -7,23 +7,17 @@ include_once 'PHP/TT_Hopdong_TCB_PHP.php';
     <?php include_once 'html/headertitle.php'; ?>
     <link href="css/agent.css" rel="stylesheet">
     <style>
-        /* ===================================================
-           STYLE BỔ SUNG CHO MODAL CÂY HỢP ĐỒNG (layout mới)
-           =================================================== */
-
         /* Modal rộng hơn để hiển thị đủ nội dung */
         #modal-agent-tree .modal-dialog {
             width: 680px;
             max-width: 95vw;
         }
-
         /* Vùng scroll cho nội dung cây */
         #tree-modal-body {
             max-height: 70vh;
             overflow-y: auto;
             padding: 14px 16px;
         }
-
         /* Spinner loading */
         .tree-loading {
             text-align: center;
@@ -96,7 +90,9 @@ include_once 'PHP/TT_Hopdong_TCB_PHP.php';
 </div>
 
 <!-- ===================================================== -->
-<!-- MODAL CÂY HỢP ĐỒNG (layout dòng mới)                 -->
+<!-- MODAL CÂY HỢP ĐỒNG — BẮT BUỘC PHẢI CÓ               -->
+<!-- JS gọi $('#modal-agent-tree').modal('show')           -->
+<!-- Nếu thiếu block này, click link sẽ không có phản hồi -->
 <!-- ===================================================== -->
 <div class="modal fade" id="modal-agent-tree" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">

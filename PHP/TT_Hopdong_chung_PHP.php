@@ -1,8 +1,11 @@
-<?php 
-    session_start() ;
+<?php
+    session_start();
     include_once 'define.php';
     include_once PATH_MAIN_FUNCTION.'/conn-login-logout.php';
-   	$conn = connection_to_database();
+    include_once PATH_MAIN_FUNCTION.'/pagination.php';
+    $conn = connection_to_database();
+
+    define('TTCHUNG_PER_PAGE', 25);
 	
     $xhtmlChonGioiTinh=  '<select name="select_GioiTinh" id="select_GioiTinh" class="input-sm" style="width:110px;">
                             <option value="">Giới tính</option>
@@ -135,26 +138,52 @@
 		$status_Agent = trim(urldecode(base64_decode($_GET['v'])));
 	}
 
-    $sql="SELECT hd.`SoHD`,hd.`Iv`,hd.`HSs`,hd.`KB`, kh.`MaKH`, hd.`LoaiHD`, hd.`NgayNopTien1`, hd.`NgayPHHD`, hd.`NgayhuyHD`,hd.`TrangThaiHD`, hd.`GhiChu`,hd.`maNV_nhap`, hd.`fullname_NVnhap`, hd.`maNV_banhang`, hd.agent_id_banhang,hd.TrangThaiHDCho, hd.SoDVTC * hd.SonamHD * 1260000 AS trigia_hd FROM `tbl_hopdong_ttchung` hd inner join tbl_khachhang kh on hd.khachhang_id = kh.id WHERE 1 ";
-	
-	// Filter trạng thái
-	$allowed = ['Dang_hoat_dong','Tam_dung','Da_ket_thuc','Da_huy_trong_21_ngay','Da_huy_sau_21_ngay'];
-	if ($status_Agent !== '' && in_array($status_Agent, $allowed)) {
-		$sql .= " AND TrangThaiHD = '" . mysqli_real_escape_string($conn, $status_Agent) . "' ";
-	}
+    // Build WHERE
+    $whereHD = "WHERE 1";
 
+    // Filter trạng thái
+    $allowed = ['Dang_hoat_dong','Tam_dung','Da_ket_thuc','Da_huy_trong_21_ngay','Da_huy_sau_21_ngay'];
+    if ($status_Agent !== '' && in_array($status_Agent, $allowed)) {
+        $whereHD .= " AND TrangThaiHD = '" . mysqli_real_escape_string($conn, $status_Agent) . "'";
+    }
     if (isset($_POST['search']) && !empty($_POST['textcond'])) {
-    $textcond = mysqli_real_escape_string($conn, $_POST['textcond']);
-    $sql .= " AND (SoHD  LIKE '%$textcond%'
+        $textcond = mysqli_real_escape_string($conn, $_POST['textcond']);
+        $whereHD .= " AND (SoHD  LIKE '%$textcond%'
                OR HSs LIKE '%$textcond%'
                OR KB LIKE '%$textcond%'
                OR  LoaiHD LIKE '%$textcond%'
                OR  MaKH LIKE '%$textcond%'
                OR  maNV_banhang LIKE '%$textcond%')";
-	}
-    $sql.=" ORDER BY NgayNopTien1 DESC ";
-//echo $sql;
-    $result=mysqli_query($conn,$sql) or die('Could not select data'.mysqli_error($conn));
+    }
+
+    // --------------------------------------------------
+    // PHÂN TRANG: đếm tổng
+    // --------------------------------------------------
+    $countSqlHD = "
+        SELECT COUNT(*) AS total
+        FROM `tbl_hopdong_ttchung` hd
+        INNER JOIN tbl_khachhang kh ON hd.khachhang_id = kh.id
+        $whereHD";
+    $totalRowsHD = (int)mysqli_fetch_assoc(mysqli_query($conn, $countSqlHD))['total'];
+
+    $requestedPage = isset($_POST['page']) ? (int)$_POST['page'] : 1;
+    [$currentPage, $totalPages, $offset] = getPaginationParams($totalRowsHD, $requestedPage, TTCHUNG_PER_PAGE);
+
+    // --------------------------------------------------
+    // QUERY CHÍNH có LIMIT/OFFSET
+    // --------------------------------------------------
+    $sql = "SELECT hd.`SoHD`,hd.`Iv`,hd.`HSs`,hd.`KB`, kh.`MaKH`, hd.`LoaiHD`,
+                   hd.`NgayNopTien1`, hd.`NgayPHHD`, hd.`NgayhuyHD`,hd.`TrangThaiHD`,
+                   hd.`GhiChu`,hd.`maNV_nhap`, hd.`fullname_NVnhap`,
+                   hd.`maNV_banhang`, hd.agent_id_banhang,hd.TrangThaiHDCho,
+                   hd.SoDVTC * hd.SonamHD * 1260000 AS trigia_hd
+            FROM `tbl_hopdong_ttchung` hd
+            INNER JOIN tbl_khachhang kh ON hd.khachhang_id = kh.id
+            $whereHD
+            ORDER BY NgayNopTien1 DESC
+            LIMIT $offset, " . TTCHUNG_PER_PAGE;
+
+    $result = mysqli_query($conn, $sql) or die('Could not select data'.mysqli_error($conn));
     $no=0;
 	if(mysqli_num_rows($result)){
 		while ($set=mysqli_fetch_array($result,MYSQLI_ASSOC))  {
@@ -195,8 +224,9 @@
         }
 	}
 	else
-		$xhtmlItem.='<tr><td colspan = "9"> </td></tr>';
+		$xhtmlItem.='<tr><td colspan="9"> </td></tr>';
     $xhtmlItem.=' </tbody></table>';
+    $xhtmlItem .= renderPagination($currentPage, $totalPages, $totalRowsHD, TTCHUNG_PER_PAGE);
 	
 	
 	if(isset($_POST['excel'])){

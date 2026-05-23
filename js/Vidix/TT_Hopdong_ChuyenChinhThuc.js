@@ -1,183 +1,357 @@
+// ============================================================
+// js/Vidix/TT_Hopdong_ChuyenChinhThuc.js
+// Xử lý giao diện trang Hợp đồng chờ chuyển chính thức
+// ============================================================
+
 $(document).ready(function () {
 
-    // -------------------------------------------------------
-    // THÔNG BÁO SAU KHI REDIRECT (fmess qua GET)
-    // -------------------------------------------------------
-    $.urlParam = function (name) {
-        var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(window.location.href);
-        if (results && results.length > 1) { return results[1] || 0; }
-    };
-
-    $(window).load(function () {
-        var msg = $.urlParam('fmess');
-        if (msg == 1)              { showAlert('success', 'Thêm nhân viên mới thành công!'); }
-        if (msg == 2)              { showAlert('warning', 'Cập nhật thông tin nhân viên thành công!'); }
-        if (msg == 4)              { showAlert('danger',  'Đã xóa nhân viên thành công!'); }
-        if (msg == 'duplicate')    { showAlert('danger',  'Số CCCD/CMND đã tồn tại trong hệ thống!'); }
-        if (msg == 'has_sub')      { showAlert('danger',  'Không thể xóa: nhân viên này đang có người cấp dưới trong mạng lưới!'); }
-        if (msg == 'has_contract') { showAlert('danger',  'Không thể xóa: nhân viên này đã có hợp đồng được ghi nhận!'); }
+    // ----------------------------------------------------------
+    // THÔNG BÁO SAU REDIRECT (fmess qua GET)
+    // ----------------------------------------------------------
+    $(window).on('load', function () {
+        var msg = getUrlParam('fmess');
+        if (msg === 'huy_ok')    { showAlert('success', 'Hủy hợp đồng thành công!'); }
+        if (msg === 'huy_err')   { showAlert('danger',  'Có lỗi khi hủy hợp đồng. Vui lòng thử lại!'); }
     });
 
-    // -------------------------------------------------------
-    // DATEPICKER cho ngày tham gia
-    // -------------------------------------------------------
-    var dpOptions = {
-        format: 'yyyy-mm-dd',
-        todayHighlight: true,
-        autoclose: true
-    };
-    $('input[name="join_date"]').datepicker(dpOptions);
+    // ----------------------------------------------------------
+    // CHỌN TẤT CẢ / BỎ CHỌN TẤT CẢ (chỉ HĐ đủ 21 ngày)
+    // ----------------------------------------------------------
+    $('#chk-all').on('change', function () {
+        var checked = $(this).is(':checked');
+        $('.chk-hd[data-status="du_dk"]').prop('checked', checked);
+        capNhatSoLuongChon();
+    });
 
-    // -------------------------------------------------------
-    // NÚT HỦY FORM
-    // -------------------------------------------------------
-    $('#cancel_new').click(function () {
-        $('#new-agent-form').fadeOut('fast');
+    $(document).on('change', '.chk-hd', function () {
+        var total   = $('.chk-hd[data-status="du_dk"]').length;
+        var checked = $('.chk-hd[data-status="du_dk"]:checked').length;
+        $('#chk-all').prop('indeterminate', checked > 0 && checked < total);
+        $('#chk-all').prop('checked', checked === total && total > 0);
+        capNhatSoLuongChon();
+    });
+
+    // ----------------------------------------------------------
+    // NÚT CHUYỂN CHÍNH THỨC — mở modal xác nhận
+    // ----------------------------------------------------------
+    $('#btn-chuyen-ct').on('click', function () {
+        var ids = layDanhSachIdDaChon();
+        if (ids.length === 0) {
+            showAlert('warning', 'Vui lòng chọn ít nhất một hợp đồng đủ 21 ngày để chuyển!');
+            return false;
+        }
+
+        // Hiển thị danh sách HĐ đã chọn trong modal xác nhận
+        var danhSach = '';
+        ids.forEach(function (id) {
+            var row   = $('input.chk-hd[value="' + id + '"]').closest('tr');
+            var soHD  = row.find('.col-sohd').text().trim();
+            var loai  = row.find('.col-loaihd').text().trim();
+            var trigia = row.find('.col-trigia').text().trim();
+            danhSach += '<li><strong>' + escHtml(soHD) + '</strong>'
+                     +  ' (' + escHtml(loai) + ')'
+                     +  ' — Trị giá: ' + escHtml(trigia) + '</li>';
+        });
+
+        $('#modal-ct-list').html('<ul style="margin:0;padding-left:20px;">' + danhSach + '</ul>');
+        $('#modal-ct-count').text(ids.length);
+        $('#modal-confirmCT').modal('show');
         return false;
     });
 
-    $('#cancel_edit').click(function () {
-        $('#edit-agent-form').fadeOut('fast');
-        return false;
-    });
+    // ----------------------------------------------------------
+    // XÁC NHẬN CHUYỂN CHÍNH THỨC — gọi AJAX
+    // ----------------------------------------------------------
+    $('#btn-ct-xacnhan').on('click', function () {
+		var hdId = $(this).data('hd-id');
+		var soHD = $(this).data('so-hd');
 
-    // -------------------------------------------------------
-    // VALIDATION FORM THÊM MỚI
-    // -------------------------------------------------------
-    $('#submit_new').click(function () {
-        var errors = 0;
-        $('#err_new').html('');
+		if (!hdId) return;
 
-        var fullName = $.trim($('#new_full_name').val());
-        var idNumber = $.trim($('#new_id_number').val());
-        var phone    = $.trim($('#new_phone').val());
-        var rankId   = $('#new_current_rank_id').val();
-        var joinDate = $.trim($('#new_join_date').val());
+		$(this).prop('disabled', true)
+			   .html('<span class="glyphicon glyphicon-refresh spinning"></span> Đang xử lý...');
+		$('#modal-ct-result').html('').hide();
 
-        if (!fullName.length) {
-            $('#new_full_name').addClass('error_show');
-            $('#err_new').append('<small><i>Vui lòng nhập họ và tên!</i></small><br/>');
-            errors++;
-        } else { $('#new_full_name').removeClass('error_show'); }
+		$.ajax({
+			url:      'VIDIX_function/HopDong_ChuyenChinhThuc_Process.php',
+			type:     'POST',
+			dataType: 'json',
+			data:     { hopdong_ids: hdId },
+			success: function (resp) {
+				xuLyKetQua(resp, 1);
+			},
+			error: function (xhr, status, err) {
+				hienThiLoiAjax(err || 'Không thể kết nối máy chủ.');
+			},
+			complete: function () {
+				$('#btn-ct-xacnhan').prop('disabled', false)
+									.html('<span class="glyphicon glyphicon-ok"></span> Xác nhận chuyển');
+			}
+		});
+	});
 
-        if (!idNumber.length) {
-            $('#new_id_number').addClass('error_show');
-            $('#err_new').append('<small><i>Vui lòng nhập số CCCD/CMND!</i></small><br/>');
-            errors++;
-        } else { $('#new_id_number').removeClass('error_show'); }
-
-        if (!phone.length) {
-            $('#new_phone').addClass('error_show');
-            $('#err_new').append('<small><i>Vui lòng nhập số điện thoại!</i></small><br/>');
-            errors++;
-        } else { $('#new_phone').removeClass('error_show'); }
-
-        if (!rankId || rankId === '') {
-            $('#new_current_rank_id').addClass('error_show');
-            $('#err_new').append('<small><i>Vui lòng chọn cấp bậc!</i></small><br/>');
-            errors++;
-        } else { $('#new_current_rank_id').removeClass('error_show'); }
-
-        if (!joinDate.length) {
-            $('#new_join_date').addClass('error_show');
-            $('#err_new').append('<small><i>Vui lòng nhập ngày tham gia!</i></small><br/>');
-            errors++;
-        } else { $('#new_join_date').removeClass('error_show'); }
-
-        if (errors > 0) { return false; }
-    });
-
-    // -------------------------------------------------------
-    // VALIDATION FORM SỬA
-    // -------------------------------------------------------
-    $('#submit_edit').click(function () {
-        var errors = 0;
-        $('#err_edit').html('');
-
-        var fullName = $.trim($('#edit_full_name').val());
-        var phone    = $.trim($('#edit_phone').val());
-        var rankId   = $('#edit_current_rank_id').val();
-
-        if (!fullName.length) {
-            $('#edit_full_name').addClass('error_show');
-            $('#err_edit').append('<small><i>Vui lòng nhập họ và tên!</i></small><br/>');
-            errors++;
-        } else { $('#edit_full_name').removeClass('error_show'); }
-
-        if (!phone.length) {
-            $('#edit_phone').addClass('error_show');
-            $('#err_edit').append('<small><i>Vui lòng nhập số điện thoại!</i></small><br/>');
-            errors++;
-        } else { $('#edit_phone').removeClass('error_show'); }
-
-        if (!rankId || rankId === '') {
-            $('#edit_current_rank_id').addClass('error_show');
-            $('#err_edit').append('<small><i>Vui lòng chọn cấp bậc!</i></small><br/>');
-            errors++;
-        } else { $('#edit_current_rank_id').removeClass('error_show'); }
-
-        if (errors > 0) { return false; }
+    // ----------------------------------------------------------
+    // ĐÓNG MODAL CT → reload trang nếu có bản ghi thành công
+    // ----------------------------------------------------------
+    $('#modal-confirmCT').on('hidden.bs.modal', function () {
+        if ($(this).data('co-thanh-cong')) {
+            location.reload();
+        }
     });
 
 }); // end document.ready
 
 
-// -------------------------------------------------------
-// HÀM HIỆN FORM THÊM MỚI
-// -------------------------------------------------------
-function showNewForm() {
-    $('#edit-agent-form').fadeOut('fast');
-    $('#err_new').html('');
-    $('#new_full_name, #new_id_number, #new_phone, #new_email').val('').removeClass('error_show');
-    $('#new_bank_account, #new_bank_name, #new_join_date').val('').removeClass('error_show');
-    $('#new_current_rank_id').val('').removeClass('error_show');
-    $('#new_sponsor_agent_id').val('');
-    $('#new_status').val('active');
-    $('#new-agent-form').fadeIn('fast');
-    return false;
+// ============================================================
+// XỬ LÝ KẾT QUẢ TRẢ VỀ TỪ SERVER
+// ============================================================
+function xuLyKetQua(resp, tongSo) {
+    if (!resp || !resp.results) {
+        hienThiLoiAjax('Phản hồi từ máy chủ không hợp lệ.');
+        return;
+    }
+
+    var results    = resp.results;
+    var soThanhCong = 0;
+    var soLoi       = 0;
+    var htmlRows    = '';
+
+    results.forEach(function (r) {
+        if (r.success) {
+            soThanhCong++;
+            htmlRows += '<tr class="success">'
+                     +  '<td><span class="glyphicon glyphicon-ok text-success"></span></td>'
+                     +  '<td><strong>' + escHtml(r.soHD) + '</strong></td>'
+                     +  '<td class="text-success">' + escHtml(r.message) + '</td>'
+                     +  '</tr>';
+        } else {
+            soLoi++;
+            htmlRows += '<tr class="danger">'
+                     +  '<td><span class="glyphicon glyphicon-remove text-danger"></span></td>'
+                     +  '<td><strong>' + escHtml(r.soHD) + '</strong></td>'
+                     +  '<td class="text-danger">' + escHtml(r.message) + '</td>'
+                     +  '</tr>';
+        }
+    });
+
+    // Tóm tắt
+    var tomTat = '';
+    if (soThanhCong > 0) {
+        tomTat += '<div class="alert alert-success" style="margin-bottom:8px;">'
+               +  '<span class="glyphicon glyphicon-ok-circle"></span> '
+               +  '<strong>' + soThanhCong + '/' + tongSo + '</strong> hợp đồng chuyển chính thức thành công.'
+               +  '</div>';
+    }
+    if (soLoi > 0) {
+        tomTat += '<div class="alert alert-danger" style="margin-bottom:8px;">'
+               +  '<span class="glyphicon glyphicon-exclamation-sign"></span> '
+               +  '<strong>' + soLoi + '</strong> hợp đồng gặp lỗi — xem chi tiết bên dưới.'
+               +  '</div>';
+    }
+
+    // Bảng chi tiết
+    var bangChiTiet = '<table class="table table-condensed table-bordered" style="margin-top:8px;font-size:12px;">'
+                   +  '<thead><tr><th width="30"></th><th width="120">Số HĐ</th><th>Kết quả</th></tr></thead>'
+                   +  '<tbody>' + htmlRows + '</tbody>'
+                   +  '</table>';
+
+    $('#modal-ct-result').html(tomTat + bangChiTiet).show();
+
+    // Ẩn nút xác nhận nếu đã xử lý xong
+    $('#btn-ct-xacnhan').hide();
+
+    // Đánh dấu cần reload khi đóng modal (nếu có ít nhất 1 thành công)
+    if (soThanhCong > 0) {
+        $('#modal-confirmCT').data('co-thanh-cong', true);
+        // Bỏ chọn checkbox của các HĐ thành công
+        results.forEach(function (r) {
+            if (r.success) {
+                $('input.chk-hd[data-sohd="' + r.soHD + '"]').closest('tr')
+                    .addClass('success').find('input').prop('disabled', true);
+            }
+        });
+    }
 }
 
-// -------------------------------------------------------
-// HÀM HIỆN FORM SỬA
-// -------------------------------------------------------
-function editAgent(agentId, fullName, idNumber, phone, email,
-                   bankAccount, bankName, rankId, status) {
 
-    $('#new-agent-form').fadeOut('fast');
-    $('#err_edit').html('');
-
-    $('#edit_agent_id').val(agentId);
-    $('#edit_agent_name_label').text(fullName);
-    $('#edit_id_number_display').val(idNumber);
-    $('#edit_full_name').val(fullName).removeClass('error_show');
-    $('#edit_phone').val(phone).removeClass('error_show');
-    $('#edit_email').val(email);
-    $('#edit_bank_account').val(bankAccount);
-    $('#edit_bank_name').val(bankName);
-    $('#edit_current_rank_id').val(rankId).removeClass('error_show');
-    $('#edit_status').val(status);
-
-    $('#edit-agent-form').fadeIn('fast');
-    $('html, body').animate({ scrollTop: $('#edit-agent-form').offset().top - 80 }, 400);
-    return false;
-}
-
-// -------------------------------------------------------
-// HÀM XÓA — mở modal xác nhận
-// -------------------------------------------------------
-function delAgent(agentId, fullName) {
-    $('#id_delete').val(agentId);
+// ============================================================
+// HỦY HỢP ĐỒNG — mở modal xác nhận
+// ============================================================
+function CancelContract(contractId, soHD) {
+    $('#id_delete').val(contractId);
     $('#modal-delete-text').html(
-        'Bạn chắc chắn muốn xóa nhân viên <strong>' + fullName + '</strong>?<br/>' +
-        '<small class="text-danger">Lưu ý: Không thể xóa nếu nhân viên đang có người cấp dưới hoặc đã có hợp đồng.</small>'
+        '⚠️ Bạn có chắc chắn muốn <strong>hủy hợp đồng ' + escHtml(soHD) + '</strong>?<br/>'
+      + '<small class="text-danger">Thao tác này <strong>không thể hoàn tác</strong>.</small>'
     );
     $('#modal-confirmDelete').modal('show');
-    return false;
 }
 
-// -------------------------------------------------------
-// HÀM HIỆN THÔNG BÁO (dùng chung)
-// -------------------------------------------------------
+
+// ============================================================
+// CÂY ĐA CẤP — hiển thị trong modal
+// ============================================================
+var DEPTH_COLORS = {
+    1: { bg: '#f0f6ff', border: '#2a5f96', text: '#1a3c5e' },
+    2: { bg: '#f0fff5', border: '#27ae60', text: '#1e8449' },
+    3: { bg: '#fff8f0', border: '#e67e22', text: '#d35400' },
+    4: { bg: '#fdf0ff', border: '#8e44ad', text: '#7d3c98' },
+    5: { bg: '#fff0f0', border: '#c0392b', text: '#a93226' },
+    6: { bg: '#f0fffe', border: '#16a085', text: '#0e8074' },
+    7: { bg: '#fffff0', border: '#d4ac0d', text: '#b7950b' },
+    8: { bg: '#f5f5f5', border: '#7f8c8d', text: '#626567' }
+};
+
+function showAgentTree(agentId, agentName) {
+    $('#tree-modal-name').text(agentName);
+    $('#tree-modal-body').html(
+        '<div class="tree-loading">'
+      + '<div class="spinner"></div><br/>Đang tải dữ liệu mạng lưới...</div>'
+    );
+    $('#modal-agent-tree').modal('show');
+
+    $.ajax({
+        url:      'VIDIX_function/getAgentTree.php',
+        type:     'POST',
+        dataType: 'json',
+        data:     { agent_id: agentId },
+        success: function (data) {
+            if (data.error) {
+                $('#tree-modal-body').html(
+                    '<div class="text-danger text-center" style="padding:30px;">'
+                  + '<span class="glyphicon glyphicon-warning-sign"></span> '
+                  + escHtml(data.error) + '</div>'
+                );
+                return;
+            }
+            renderTree(data);
+        },
+        error: function () {
+            $('#tree-modal-body').html(
+                '<div class="text-danger text-center" style="padding:30px;">'
+              + 'Không thể tải dữ liệu. Vui lòng thử lại.</div>'
+            );
+        }
+    });
+}
+
+function renderTree(data) {
+    var self  = data.self;
+    var tree  = data.tree;
+    var stats = data.stats;
+    var html  = '';
+
+    if (self.sponsor_id) {
+        html += '<div class="sponsor-card">'
+             +  '<span class="sp-icon">👤</span><div>'
+             +  '<div class="sp-label">Người tuyển dụng trực tiếp</div>'
+             +  '<div class="sp-name">' + escHtml(self.sponsor_name)
+             +  ' <span class="label label-primary">' + escHtml(self.sponsor_rank_code) + '</span></div>'
+             +  '</div></div>';
+    } else {
+        html += '<div class="sponsor-card" style="background:#f5f5f5;border-color:#ccc;">'
+             +  '<span class="sp-icon">🌱</span><div>'
+             +  '<div class="sp-label">Người tuyển dụng</div>'
+             +  '<div class="sp-name text-muted"><i>Nhân viên gốc</i></div>'
+             +  '</div></div>';
+    }
+
+    html += '<div class="self-card">'
+         +  '<div class="self-name">' + escHtml(self.full_name) + '</div>'
+         +  '<div class="self-meta">'
+         +  '<span class="label label-warning" style="margin-right:5px;">'
+         +  escHtml(self.rank_code) + ' - ' + escHtml(self.rank_name) + '</span>'
+         +  escHtml(self.phone) + '</div></div>';
+
+    html += '<div class="tree-stats">'
+         +  renderStatBox(stats.tong_cap_duoi, 'Cấp dưới')
+         +  renderStatBox(stats.tong_hd, 'Hợp đồng')
+         +  '</div>';
+
+    if (tree.length === 0) {
+        html += '<div class="no-data" style="text-align:center;padding:20px;color:#7f8c9a;">'
+             +  'Nhân viên này chưa có người cấp dưới.</div>';
+    } else {
+        html += '<div class="tree-section-title">Mạng lưới cấp dưới (' + tree.length + ' người)</div>';
+        for (var i = 0; i < tree.length; i++) {
+            html += renderTreeNode(tree[i]);
+        }
+    }
+    $('#tree-modal-body').html(html);
+}
+
+function renderTreeNode(node) {
+    var depth  = Math.min(parseInt(node.depth) || 1, 8);
+    var colors = DEPTH_COLORS[depth] || DEPTH_COLORS[8];
+    var connector = '';
+    for (var i = 1; i < depth; i++) {
+        connector += '<span style="display:inline-block;width:20px;text-align:center;color:#ddd;">│</span>';
+    }
+    connector += '<span style="display:inline-block;width:20px;text-align:center;color:#aaa;">├─</span>';
+
+    var hhBadge = (node.is_active == 1)
+        ? '<span style="background:#d4efdf;color:#1e8449;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">✓ HH</span>'
+        : '<span style="background:#fdecea;color:#c0392b;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">✗ HH</span>';
+
+    var rankBadge = '<span style="background:' + colors.border + ';color:#fff;'
+                  + 'padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">'
+                  + escHtml(node.rank_code) + '</span>';
+
+    return '<div style="display:flex;align-items:flex-start;padding:6px 8px;border-radius:5px;'
+         + 'margin-bottom:3px;border-left:3px solid ' + colors.border + ';background:' + colors.bg + ';">'
+         + '<div style="flex-shrink:0;font-size:12px;color:#bbb;white-space:nowrap;">' + connector + '</div>'
+         + '<div style="flex:1;min-width:0;padding:0 8px;">'
+         + '<div style="font-weight:700;font-size:13px;color:' + colors.text + ';">' + escHtml(node.full_name) + '</div>'
+         + '<div style="font-size:11px;color:#7f8c9a;margin-top:2px;">'
+         + escHtml(node.agent_code) + ' &bull; 📞 ' + escHtml(node.phone) + ' &bull; 📅 ' + escHtml(node.join_date)
+         + '</div></div>'
+         + '<div style="flex-shrink:0;text-align:right;">' + rankBadge + ' ' + hhBadge + '</div>'
+         + '</div>';
+}
+
+
+// ============================================================
+// HELPERS
+// ============================================================
+function layDanhSachIdDaChon() {
+    var ids = [];
+    $('.chk-hd[data-status="du_dk"]:checked').each(function () {
+        ids.push($(this).val());
+    });
+    return ids;
+}
+
+function capNhatSoLuongChon() {
+    var n = layDanhSachIdDaChon().length;
+    if (n > 0) {
+        $('#btn-chuyen-ct').removeClass('btn-default').addClass('btn-success')
+                           .html('<span class="glyphicon glyphicon-share-alt"></span> Chuyển chính thức (' + n + ' HĐ)');
+    } else {
+        $('#btn-chuyen-ct').removeClass('btn-success').addClass('btn-default')
+                           .html('<span class="glyphicon glyphicon-share-alt"></span> Chuyển chính thức');
+    }
+}
+
+function hienThiLoiAjax(msg) {
+    $('#modal-ct-result').html(
+        '<div class="alert alert-danger">'
+      + '<span class="glyphicon glyphicon-exclamation-sign"></span> '
+      + 'Lỗi kết nối: ' + escHtml(msg)
+      + '</div>'
+    ).show();
+}
+
+function renderStatBox(num, label) {
+    return '<div class="tree-stat-box">'
+         + '<div class="tsb-num">' + num + '</div>'
+         + '<div class="tsb-lbl">' + escHtml(String(label)) + '</div>'
+         + '</div>';
+}
+
+function getUrlParam(name) {
+    var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(window.location.href);
+    return (results && results.length > 1) ? results[1] : null;
+}
+
 function showAlert(type, message) {
     var alertId = '#' + type + '-alert';
     var textId  = '#text-' + type + '-message';
@@ -187,260 +361,6 @@ function showAlert(type, message) {
     });
 }
 
-// -------------------------------------------------------
-// CÂY ĐA CẤP — màu theo depth (tối đa 8 cấp)
-// -------------------------------------------------------
-var DEPTH_COLORS = {
-    1: { bg: '#f0f6ff', border: '#2a5f96', text: '#1a3c5e' },
-    2: { bg: '#f0fff5', border: '#27ae60', text: '#1e8449' },
-    3: { bg: '#fff8f0', border: '#e67e22', text: '#d35400' },
-    4: { bg: '#fdf0ff', border: '#8e44ad', text: '#7d3c98' },
-    5: { bg: '#fff0f0', border: '#c0392b', text: '#a93226' },
-    6: { bg: '#f0fffe', border: '#16a085', text: '#0e8074' },
-    7: { bg: '#fffff0', border: '#d4ac0d', text: '#b7950b' },
-    8: { bg: '#f5f5f5', border: '#7f8c8d', text: '#626567' },
-};
-
-var STATUS_LABEL = {
-    'active':    '<span style="background:#d4efdf;color:#1e8449;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">Đang HĐ</span>',
-    'inactive':  '<span style="background:#eee;color:#666;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">Ngừng HĐ</span>',
-    'suspended': '<span style="background:#fdecea;color:#c0392b;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">Đình chỉ</span>',
-};
-
-// -------------------------------------------------------
-// HÀM CHÍNH: Gọi AJAX, render modal cây đa cấp
-// -------------------------------------------------------
-function showAgentTree(agentId, agentName) {
-
-    // Đặt tiêu đề modal và show loading
-    $('#tree-modal-name').text(agentName);
-    $('#tree-modal-body').html(
-        '<div class="tree-loading">' +
-        '<div class="spinner"></div><br/>Đang tải dữ liệu mạng lưới...</div>'
-    );
-    $('#modal-agent-tree').modal('show');
-
-    // Gọi AJAX
-    $.ajax({
-        url:      'VIDIX_function/getAgentTree.php',
-        type:     'POST',
-        dataType: 'json',
-        data:     { agent_id: agentId },
-        success: function (data) {
-            if (data.error) {
-                $('#tree-modal-body').html(
-                    '<div class="text-danger text-center" style="padding:30px;">' +
-                    '<span class="glyphicon glyphicon-warning-sign"></span> ' +
-                    data.error + '</div>'
-                );
-                return;
-            }
-            renderTree(data);
-        },
-        error: function () {
-            $('#tree-modal-body').html(
-                '<div class="text-danger text-center" style="padding:30px;">' +
-                '<span class="glyphicon glyphicon-warning-sign"></span> ' +
-                'Không thể tải dữ liệu. Vui lòng thử lại.</div>'
-            );
-        }
-    });
-}
-
-// -------------------------------------------------------
-// RENDER TOÀN BỘ NỘI DUNG MODAL
-// -------------------------------------------------------
-function renderTree(data) {
-    var self   = data.self;
-    var tree   = data.tree;
-    var stats  = data.stats;
-    var html   = '';
-
-    // ---- 1. Ô người tuyển dụng (sponsor) ----
-    if (self.sponsor_id) {
-        html += '<div class="sponsor-card">';
-        html += '<span class="sp-icon">👤</span>';
-        html += '<div>';
-        html += '<div class="sp-label">Người tuyển dụng trực tiếp</div>';
-        html += '<div class="sp-name">';
-        html += escHtml(self.sponsor_name) + ' &nbsp;';
-        html += '<span class="label label-primary">' + escHtml(self.sponsor_rank_code) + '</span>';
-        html += '</div>';
-        html += '</div>';
-        html += '</div>';
-    } else {
-        html += '<div class="sponsor-card" style="background:#f5f5f5;border-color:#ccc;">';
-        html += '<span class="sp-icon">🌱</span>';
-        html += '<div>';
-        html += '<div class="sp-label">Người tuyển dụng</div>';
-        html += '<div class="sp-name text-muted"><i>Nhân viên gốc (không có người tuyển dụng)</i></div>';
-        html += '</div>';
-        html += '</div>';
-    }
-
-    // ---- 2. Thẻ thông tin bản thân ----
-    html += '<div class="self-card">';
-    html += '<div class="self-avatar">👤</div>';
-    html += '<div>';
-    html += '<div class="self-name">' + escHtml(self.full_name) + '</div>';
-    html += '<div class="self-meta">';
-    html += '<span class="label label-warning" style="margin-right:5px;">'
-         +  escHtml(self.rank_code) + ' - ' + escHtml(self.rank_name) + '</span>';
-    html += escHtml(self.phone);
-    if (self.email) html += ' &bull; ' + escHtml(self.email);
-    html += '<br/><small>Ngày tham gia: ' + escHtml(self.join_date) + '</small>';
-    html += '</div>';
-    html += '</div>';
-    html += '<div class="self-stats">';
-    html += '<div class="self-stat-item">';
-    html += '<span class="self-stat-num">' + stats.tong_cap_duoi + '</span>';
-    html += '<span class="self-stat-lbl">Cấp dưới</span>';
-    html += '</div>';
-    html += '<div class="self-stat-item">';
-    html += '<span class="self-stat-num">' + self.so_hd + '</span>';
-    html += '<span class="self-stat-lbl">Hợp đồng</span>';
-    html += '</div>';
-    html += '</div>';
-    html += '</div>'; // end self-card
-
-    // ---- 3. Thống kê tổng hợp ----
-    html += '<div class="tree-stats">';
-    html += renderStatBox(stats.tong_cap_duoi, 'Tổng cấp dưới');
-    html += renderStatBox(stats.tong_hd,       'Tổng hợp đồng');
-
-    // Phân bổ theo cấp
-    var phanBo = stats.phan_bo_cap;
-    var phanBoArr = [];
-    for (var key in phanBo) { phanBoArr.push(phanBo[key]); }
-    // Sắp xếp theo rank_code
-    phanBoArr.sort(function(a, b) { return a.rank_code > b.rank_code ? 1 : -1; });
-    for (var i = 0; i < phanBoArr.length; i++) {
-        html += renderStatBox(phanBoArr[i].count, phanBoArr[i].rank_code);
-    }
-    html += '</div>';
-
-    // ---- 4. Cây cấp dưới ----
-    if (tree.length === 0) {
-        html += '<div class="no-data" style="text-align:center;padding:20px;color:#7f8c9a;">';
-        html += '<span style="font-size:28px;display:block;margin-bottom:6px;">🌿</span>';
-        html += 'Nhân viên này chưa có người cấp dưới trong mạng lưới.';
-        html += '</div>';
-    } else {
-        html += '<div class="tree-section-title">';
-        html += '<span class="glyphicon glyphicon-tree-conifer"></span>';
-        html += ' Mạng lưới cấp dưới (' + tree.length + ' người)';
-        html += '</div>';
-
-        // Chú thích màu
-        html += '<div style="font-size:11px;color:#7f8c9a;margin-bottom:8px;">';
-        html += '<span style="background:#d4efdf;color:#1e8449;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px;">✓ Đang nhận HH</span>';
-        html += '<span style="background:#fdecea;color:#c0392b;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;">✗ Không nhận HH</span>';
-        html += ' (do ngang hoặc vượt cấp bạn)</div>';
-
-        html += '<div class="tree-scroll">';
-        for (var j = 0; j < tree.length; j++) {
-            html += renderTreeNode(tree[j]);
-        }
-        html += '</div>';
-    }
-
-    $('#tree-modal-body').html(html);
-}
-
-// -------------------------------------------------------
-// RENDER 1 NODE TRONG CÂY
-// -------------------------------------------------------
-function renderTreeNode(node) {
-    var depth  = Math.min(parseInt(node.depth) || 1, 8);
-    var colors = DEPTH_COLORS[depth] || DEPTH_COLORS[8];
-    var indent = (depth - 1) * 20; // px thụt lề
-
-    // Biểu tượng nối cây
-    var treeConnector = '';
-    for (var i = 1; i < depth; i++) {
-        treeConnector += '<span style="display:inline-block;width:20px;text-align:center;color:#ddd;">│</span>';
-    }
-    treeConnector += '<span style="display:inline-block;width:20px;text-align:center;color:#aaa;">├─</span>';
-
-    // Badge nhận hoa hồng
-    var hhBadge = (node.is_active == 1)
-        ? '<span style="background:#d4efdf;color:#1e8449;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">✓ Nhận HH</span>'
-        : '<span style="background:#fdecea;color:#c0392b;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">✗ HH</span>';
-
-    // Badge trạng thái agent
-    var agentStatus = STATUS_LABEL[node.status] || node.status;
-
-    // Badge cấp bậc
-    var rankBadge = '<span style="background:' + colors.border + ';color:#fff;'
-        + 'padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">'
-        + escHtml(node.rank_code) + '</span>';
-
-    var html = '';
-    html += '<div style="'
-        + 'display:flex;align-items:flex-start;'
-        + 'padding:6px 8px;border-radius:5px;margin-bottom:3px;'
-        + 'border-left:3px solid ' + colors.border + ';'
-        + 'background:' + colors.bg + ';'
-        + '">';
-
-    // Thụt lề + connector
-    html += '<div style="flex-shrink:0;font-size:12px;color:#bbb;white-space:nowrap;">'
-         + treeConnector + '</div>';
-
-    // Icon theo depth
-    var depthIcon = depth === 1 ? '👤' : (depth === 2 ? '👥' : '•');
-    html += '<div style="flex-shrink:0;margin:0 8px;font-size:14px;">' + depthIcon + '</div>';
-
-    // Nội dung chính
-    html += '<div style="flex:1;min-width:0;">';
-    html += '<div style="font-weight:700;font-size:13px;color:' + colors.text + ';">';
-    html += escHtml(node.full_name);
-    html += '</div>';
-    html += '<div style="font-size:11px;color:#7f8c9a;margin-top:2px;display:flex;flex-wrap:wrap;gap:6px;">';
-    html += '<span>' + escHtml(node.agent_code) + '</span>';
-    html += '<span>📞 ' + escHtml(node.phone) + '</span>';
-    html += '<span>📅 ' + escHtml(node.join_date) + '</span>';
-    if (node.sponsor_name) {
-        html += '<span>👤 Tuyển bởi: ' + escHtml(node.sponsor_name) + '</span>';
-    }
-    html += '</div>';
-    html += '</div>';
-
-    // Badges bên phải
-    html += '<div style="flex-shrink:0;text-align:right;padding-left:8px;">';
-    html += rankBadge + ' ';
-    html += hhBadge + '<br/>';
-    html += '<span style="font-size:11px;color:#7f8c9a;margin-top:3px;display:inline-block;">';
-
-    if (node.so_cap_duoi > 0) {
-        html += '<span class="glyphicon glyphicon-user" style="font-size:10px;"></span> '
-             +  node.so_cap_duoi + ' cấp dưới &nbsp;';
-    }
-    if (node.so_hd > 0) {
-        html += '<span class="glyphicon glyphicon-file" style="font-size:10px;"></span> '
-             +  node.so_hd + ' HĐ';
-    }
-    html += '</span>';
-    html += '<br/>' + agentStatus;
-    html += '</div>';
-
-    html += '</div>'; // end node div
-    return html;
-}
-
-// -------------------------------------------------------
-// HELPER: Render ô thống kê nhỏ
-// -------------------------------------------------------
-function renderStatBox(num, label) {
-    return '<div class="tree-stat-box">'
-        + '<div class="tsb-num">' + num + '</div>'
-        + '<div class="tsb-lbl">' + escHtml(String(label)) + '</div>'
-        + '</div>';
-}
-
-// -------------------------------------------------------
-// HELPER: Escape HTML để tránh XSS
-// -------------------------------------------------------
 function escHtml(str) {
     if (!str) return '';
     return String(str)
@@ -450,16 +370,25 @@ function escHtml(str) {
         .replace(/"/g,  '&quot;')
         .replace(/'/g,  '&#039;');
 }
+// -------------------------------------------------------
+// MỞ MODAL XÁC NHẬN CHUYỂN CHÍNH THỨC — từng HĐ
+// -------------------------------------------------------
+function xacNhanChuyenCT(hdId, soHD, loaiHD, trigia) {
+    // Hiển thị thông tin HĐ trong modal
+    $('#modal-ct-list').html(
+        '<ul style="margin:0;padding-left:20px;">'
+      + '<li><strong>' + escHtml(soHD) + '</strong>'
+      + ' (' + escHtml(loaiHD) + ')'
+      + ' — Trị giá: ' + escHtml(trigia) + '</li>'
+      + '</ul>'
+    );
+    $('#modal-ct-count').text('1');
+    $('#modal-ct-result').html('').hide();
+    $('#btn-ct-xacnhan').show().prop('disabled', false)
+                        .html('<span class="glyphicon glyphicon-ok"></span> Xác nhận chuyển');
 
-function CancelContract(contractId) {
-    // Gán ID hợp đồng vào input hidden
-    document.getElementById('id_delete').value = contractId;
+    // Gán ID vào nút xác nhận để dùng khi gọi AJAX
+    $('#btn-ct-xacnhan').data('hd-id', hdId).data('so-hd', soHD);
 
-    // Nội dung thông báo trong modal
-    document.getElementById('modal-delete-text').innerHTML =
-        '⚠️ Bạn có chắc chắn muốn <strong>hủy hợp đồng</strong> này không? ' +
-        '<br>Thao tác này <strong>không thể hoàn tác</strong>.';
-
-    // Hiện modal
-    $('#modal-confirmDelete').modal('show');
+    $('#modal-confirmCT').removeData('co-thanh-cong').modal('show');
 }

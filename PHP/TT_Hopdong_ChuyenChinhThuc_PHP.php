@@ -283,7 +283,7 @@ $xhtmlItem = '
             <th width="40px">#</th>
             <th width="350px">Thông tin HĐ</th>
             <th width="150px">Thông tin KH</th>
-            <th width="100px">Ngày nộp tiền</th>
+            <th width="100px">Thông tin nộp tiền</th>
             <th width="120px">Status</th>
             <th width="310px">Thông tin NV</th>
             <th width="80px" class="text-center">Thao tác</th>
@@ -314,7 +314,7 @@ if (mysqli_num_rows($result)) {
 			$xhtmlItem .= '<br/> <span class = "text-success">(KH đăng ký TC B)</span>';
 		}
 		$xhtmlItem .= '</td>
-            <td>' . htmlspecialchars($row['NgayNopTien1']) . '</td>
+            <td>' . htmlspecialchars($row['NgayNopTien1']) . '/<br/>'.$row['NgayNopTien1'].'</td>
             <td class="text-center" style="padding-top:15px;">' . $statusBadge . '</td>
 			<td>
 				NVBH:'.htmlspecialchars($row['maNV_banhang']).' - '.htmlspecialchars($row['full_name']).'
@@ -322,9 +322,11 @@ if (mysqli_num_rows($result)) {
 			</td>
             <td class="text-center action-cell">';
 		if($row['status_cho'] ==='du_dk'){
-			$xhtmlItem .= '<a href="#" class="btn btn-xs btn-warning action-btn" title="Chuyển chính thức">
-						<span class="glyphicon glyphicon-share-alt text-primary"></span>
-							</a> &nbsp;';
+			$xhtmlItem .= '<a href="#" class="btn btn-xs btn-warning action-btn"
+							title="Chuyển chính thức"
+							onclick="xacNhanChuyenCT(' . $row['id'] . ', \'' . htmlspecialchars($row['KB'], ENT_QUOTES) . '\', \'' . htmlspecialchars($row['LoaiHD'], ENT_QUOTES) . '\', \'' . number_format($row['trigia_hd']) . '\'); return false;">
+							<span class="glyphicon glyphicon-share-alt text-primary"></span>
+						</a> &nbsp;';
 		}
         $xhtmlItem .= '<a href="#" class="btn btn-xs btn-danger action-btn"
                    onclick="CancelContract(' . $row['id'] . '); return false;" title="Hủy hợp đồng">

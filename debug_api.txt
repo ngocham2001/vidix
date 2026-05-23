@@ -1,0 +1,9 @@
+=== DEBUG API_getAgentTree ===
+Time: 2026-05-14 11:12:43
+__DIR__: C:\xampp\htdocs\vidix\VIDIX_function
+rootPath: C:\xampp\htdocs\vidix
+DOCUMENT_ROOT: C:/xampp/htdocs/vidix
+connFile: C:/xampp/htdocs/vidix/functions/conn-login-logout.php
+connFile exists: YES
+define.php exists: YES
+

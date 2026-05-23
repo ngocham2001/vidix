@@ -2,7 +2,10 @@
 session_start();
 include_once 'define.php';
 include_once PATH_MAIN_FUNCTION . '/conn-login-logout.php';
+include_once PATH_MAIN_FUNCTION . '/pagination.php';
 $conn = connection_to_database();
+
+define('AGENT_PER_PAGE', 20);
 
 // -------------------------------------------------------
 // HELPER: Xây dựng closure table khi thêm nhân viên mới
@@ -250,19 +253,51 @@ $xhtmlSelectSponsor = "<select name='sponsor_agent_id' id='new_sponsor_agent_id'
 // -------------------------------------------------------
 // XÂY DỰNG BẢNG HIỂN THỊ
 // -------------------------------------------------------
+// -------------------------------------------------------
+// XÂY DỰNG ĐIỀU KIỆN WHERE (dùng chung cho COUNT và SELECT)
+// -------------------------------------------------------
+$whereAgent = "WHERE 1";
+
+if (isset($_POST['search']) && !empty($_POST['textcond'])) {
+    $textcond    = mysqli_real_escape_string($conn, $_POST['textcond']);
+    $whereAgent .= " AND (a.full_name  LIKE '%$textcond%'
+               OR  a.id_number  LIKE '%$textcond%'
+               OR  a.phone      LIKE '%$textcond%'
+               OR  a.agent_code LIKE '%$textcond%'
+               OR  rc.rank_code LIKE '%$textcond%')";
+}
+if (isset($_POST['filter_status']) && $_POST['filter_status'] !== '') {
+    $fStatus     = mysqli_real_escape_string($conn, $_POST['filter_status']);
+    $whereAgent .= " AND a.status = '$fStatus'";
+}
+
+// -------------------------------------------------------
+// PHÂN TRANG: đếm tổng bản ghi
+// -------------------------------------------------------
+$countSqlAgent = "
+    SELECT COUNT(*) AS total
+    FROM   agent a
+    JOIN   rank_config rc ON rc.rank_id  = a.current_rank_id
+    $whereAgent";
+$totalRowsAgent = (int)mysqli_fetch_assoc(mysqli_query($conn, $countSqlAgent))['total'];
+
+$requestedPage = isset($_POST['page']) ? (int)$_POST['page'] : 1;
+[$currentPage, $totalPages, $offset] = getPaginationParams($totalRowsAgent, $requestedPage, AGENT_PER_PAGE);
+
+// -------------------------------------------------------
+// QUERY CHÍNH có LIMIT/OFFSET
+// -------------------------------------------------------
 $sql = "
     SELECT
         a.*,
         rc.rank_code, rc.rank_name,
         sp.full_name  AS sponsor_name,
         sp.agent_code AS sponsor_code,
-        -- Đếm cấp dưới trực tiếp
         (SELECT COUNT(*)
          FROM agent_hierarchy ah
-         WHERE ah.ancestor_id  = a.agent_id
-           AND ah.depth        = 1
+         WHERE ah.ancestor_id   = a.agent_id
+           AND ah.depth         = 1
            AND ah.descendant_id != a.agent_id) AS so_cap_duoi,
-        -- Đếm HĐ đang hoạt động
         (SELECT COUNT(*)
          FROM tbl_hopdong_ttchung hd
          WHERE hd.agent_id_banhang = a.agent_id
@@ -270,22 +305,9 @@ $sql = "
     FROM  agent a
     JOIN  rank_config rc ON rc.rank_id  = a.current_rank_id
     LEFT JOIN agent sp   ON sp.agent_id = a.sponsor_agent_id
-    WHERE 1
-";
-
-if (isset($_POST['search']) && !empty($_POST['textcond'])) {
-    $textcond = mysqli_real_escape_string($conn, $_POST['textcond']);
-    $sql .= " AND (a.full_name  LIKE '%$textcond%'
-               OR  a.id_number  LIKE '%$textcond%'
-               OR  a.phone      LIKE '%$textcond%'
-               OR  a.agent_code LIKE '%$textcond%'
-               OR  rc.rank_code LIKE '%$textcond%')";
-}
-if (isset($_POST['filter_status']) && $_POST['filter_status'] !== '') {
-    $fStatus = mysqli_real_escape_string($conn, $_POST['filter_status']);
-    $sql .= " AND a.status = '$fStatus'";
-}
-$sql .= " ORDER BY rc.rank_id DESC, a.join_date ASC";
+    $whereAgent
+    ORDER BY rc.rank_id DESC, a.join_date ASC
+    LIMIT $offset, " . AGENT_PER_PAGE;
 
 $result = mysqli_query($conn, $sql) or die(mysqli_error($conn));
 
@@ -391,4 +413,5 @@ if (mysqli_num_rows($result)) {
     $xhtmlItem .= '<tr><td colspan="11" class="text-center text-muted">Chưa có dữ liệu</td></tr>';
 }
 $xhtmlItem .= '</tbody></table>';
+$xhtmlItem .= renderPagination($currentPage, $totalPages, $totalRowsAgent, AGENT_PER_PAGE);
 ?>

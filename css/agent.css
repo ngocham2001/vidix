@@ -150,4 +150,15 @@
 		.action-cell {
 			white-space: nowrap;      /* tránh xuống dòng */
 		}
-		
+		/* Hiệu ứng spinning cho icon loading */
+		.spinning {
+			animation: spin 1s linear infinite;
+			display: inline-block;
+		}
+		@keyframes spin { to { transform: rotate(360deg); } }
+		 
+		/* Checkbox cột đầu bảng */
+		.chk-hd:disabled { opacity: 0.35; cursor: not-allowed; }
+		 
+		/* Dòng đã xử lý thành công — mờ nhẹ */
+		tr.success td { opacity: 0.7; }

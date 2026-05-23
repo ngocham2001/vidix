@@ -2,7 +2,10 @@
 session_start();
 include_once 'define.php';
 include_once PATH_MAIN_FUNCTION . '/conn-login-logout.php';
+include_once PATH_MAIN_FUNCTION . '/pagination.php';
 $conn = connection_to_database();
+
+define('CONTRACT_PER_PAGE', 20);
 
 // -------------------------------------------------------
 // XỬ LÝ THÊM HỢP ĐỒNG MỚI
@@ -87,25 +90,42 @@ $xhtmlSelectAgent     = "<select name='agent_id' id='new_agent_id' class='input-
 $xhtmlSelectAgentEdit = "<select name='edit_agent_id' id='edit_agent_id' class='input-sm' style='width:260px;' disabled>$agentOptions</select>";
 
 // -------------------------------------------------------
-// XÂY DỰNG BẢNG DỮ LIỆU
+// XÂY DỰNG ĐIỀU KIỆN WHERE (dùng chung cho COUNT và SELECT)
 // -------------------------------------------------------
 $where = "WHERE 1";
 if (isset($_POST['search']) && !empty($_POST['textcond'])) {
-    $tc = mysqli_real_escape_string($conn, $_POST['textcond']);
+    $tc    = mysqli_real_escape_string($conn, $_POST['textcond']);
     $where .= " AND (c.customer_name LIKE '%$tc%'
                  OR  c.customer_id_number LIKE '%$tc%'
                  OR  c.contract_id LIKE '%$tc%'
                  OR  a.full_name LIKE '%$tc%')";
 }
 if (isset($_POST['filter_status']) && $_POST['filter_status'] !== '') {
-    $fs = mysqli_real_escape_string($conn, $_POST['filter_status']);
+    $fs    = mysqli_real_escape_string($conn, $_POST['filter_status']);
     $where .= " AND c.status = '$fs'";
 }
 if (isset($_POST['filter_payment']) && $_POST['filter_payment'] !== '') {
-    $fp = mysqli_real_escape_string($conn, $_POST['filter_payment']);
+    $fp    = mysqli_real_escape_string($conn, $_POST['filter_payment']);
     $where .= " AND c.payment_type = '$fp'";
 }
 
+// -------------------------------------------------------
+// PHÂN TRANG: đếm tổng bản ghi
+// -------------------------------------------------------
+$countSqlContract = "
+    SELECT COUNT(DISTINCT c.contract_id) AS total
+    FROM   contract c
+    JOIN   agent a        ON a.agent_id = c.agent_id
+    JOIN   rank_config rc ON rc.rank_id = a.current_rank_id
+    $where";
+$totalRowsContract = (int)mysqli_fetch_assoc(mysqli_query($conn, $countSqlContract))['total'];
+
+$requestedPage = isset($_POST['page']) ? (int)$_POST['page'] : 1;
+[$currentPage, $totalPages, $offset] = getPaginationParams($totalRowsContract, $requestedPage, CONTRACT_PER_PAGE);
+
+// -------------------------------------------------------
+// QUERY CHÍNH có LIMIT/OFFSET
+// -------------------------------------------------------
 $sql = "SELECT c.*,
                a.full_name AS agent_name,
                rc.rank_code,
@@ -117,7 +137,8 @@ $sql = "SELECT c.*,
         LEFT JOIN payment_record pr ON pr.contract_id = c.contract_id AND pr.is_first_year = 1
         $where
         GROUP  BY c.contract_id
-        ORDER  BY c.start_date DESC";
+        ORDER  BY c.start_date DESC
+        LIMIT  $offset, " . CONTRACT_PER_PAGE;
 
 $result = mysqli_query($conn, $sql) or die(mysqli_error($conn));
 
@@ -203,4 +224,5 @@ if (mysqli_num_rows($result)) {
     $xhtmlItem .= '<tr><td colspan="11" class="text-center text-muted">Chưa có dữ liệu</td></tr>';
 }
 $xhtmlItem .= '</tbody></table>';
+$xhtmlItem .= renderPagination($currentPage, $totalPages, $totalRowsContract, CONTRACT_PER_PAGE);
 ?>
